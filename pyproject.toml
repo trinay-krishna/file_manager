@@ -14,6 +14,7 @@ dependencies = [
     "langchain-ollama>=1.1.0",
     "langgraph>=1.2.11",
     "langsmith>=0.11.0",
+    "llama-cloud>=2.14.0",
 ]
 
 [project.scripts]

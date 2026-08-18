@@ -424,6 +424,7 @@ dependencies = [
     { name = "langchain-ollama" },
     { name = "langgraph" },
     { name = "langsmith" },
+    { name = "llama-cloud" },
 ]
 
 [package.metadata]
@@ -434,6 +435,7 @@ requires-dist = [
     { name = "langchain-ollama", specifier = ">=1.1.0" },
     { name = "langgraph", specifier = ">=1.2.11" },
     { name = "langsmith", specifier = ">=0.11.0" },
+    { name = "llama-cloud", specifier = ">=2.14.0" },
 ]
 
 [[package]]
@@ -808,6 +810,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5b/62/a917e87073767db8ca335c3f5a42fb4c5336509b8d5b03e165e46da47e70/langsmith-0.11.0.tar.gz", hash = "sha256:7339f90e6fd9a1a009445b5084a7a0e56a8b6f17305ee5d7e8c5e7582217854f", size = 4805612, upload-time = "2026-08-14T12:56:55.409Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/aa/18d334f04c12bb9154568747539a1143a93d0c34b894662c065454f396c8/langsmith-0.11.0-py3-none-any.whl", hash = "sha256:e87a3929915936c066b3fa3283ec3f3f0013e2ef7f98a443a7fbe3fab8e784a3", size = 737950, upload-time = "2026-08-14T12:56:53.014Z" },
+]
+
+[[package]]
+name = "llama-cloud"
+version = "2.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4d/2e/49edaf9a87e21a956e3eb5ad26ff8404a048b052bf6763cf9d95bad7cf1d/llama_cloud-2.14.0.tar.gz", hash = "sha256:a222cd24867c058b69d35cf8f744bb5b19ae34442a4174d82a5f05094e1f788a", size = 3589424, upload-time = "2026-08-12T23:25:11.613Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/09/65/c535e524a56c39e91f43e2669e1065e9da68a683caafe097ff0ad35b07e6/llama_cloud-2.14.0-py3-none-any.whl", hash = "sha256:d34ce0b4487a316ff8baa765729fd0eec9d6b079a1be35c88c973c6d894bfa40", size = 500673, upload-time = "2026-08-12T23:25:10.218Z" },
 ]
 
 [[package]]
