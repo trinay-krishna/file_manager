@@ -9,7 +9,9 @@ from langgraph.graph import StateGraph, START, END
 import asyncio
 from typing import Annotated
 import operator
-from langgraph.types import Send
+from langgraph.types import Send, interrupt, Command
+from langgraph.checkpoint.memory import InMemorySaver
+import sys
 
 load_dotenv()
 
@@ -62,6 +64,8 @@ class Shelf_Metadata(BaseModel):
         description="A list of important keywords representing the subjects, categories, document types, or themes associated with this shelf. Use broad, reusable terms that can be matched against file metadata."
     )
 
+
+
 class File(BaseModel):
     metadata: MetaData
 
@@ -112,7 +116,9 @@ class WorkerState(TypedDict):
     file: File
 
 #Added for the sake of testing while developing, should ideally be fetched from database.
-shelves = []
+shelves = [
+    #Shelf(files=[], metadata=Shelf_Metadata(shelf_name="Environmental Studies", shelf_description="# Shelf for Environmental Studies and Sustainability", tags=["environmental studies", "sustainability", "climate change", "global warming", "ecology", "conservation"]))
+]
 
 meta_data_extractor = model.with_structured_output(MetaData)
 shelf_assign_model = model.with_structured_output(CheckShelf)
@@ -227,10 +233,21 @@ def create_shelf(state: State):
         files=[state["file"]]
     )
 
-    shelves.append(shelf)
+    result = interrupt(value={
+        "interrupt_type": "shelf_create",
+        "shelf": shelf.model_dump()
+    })
+
+    edited_shelf = Shelf.model_validate(result)
+
+    if edited_shelf is None:
+        print("ERROR! UNEXPECTED RESULT!")
+        sys.exit()
+
+    shelves.append(edited_shelf)
 
     return {
-        "assigned_shelf": shelf
+        "assigned_shelf": edited_shelf
     }
 
 def assign_shelf_workers(state: State):
@@ -285,31 +302,88 @@ graph.add_conditional_edges(
 graph.add_edge("create_shelf", END)
 graph.add_edge("place_file_into_shelf",END)
 
-agent = graph.compile()
+checkpointer = InMemorySaver()
+
+agent = graph.compile(checkpointer=checkpointer)
+
+config = {
+    "configurable": {
+        "thread_id":"test_12"
+    }
+}
+
+interrupt_id = None
+interrupt_value = None
+
+async def main(resume_value = None):
+
+    global interrupt_value, interrupt_id
+    stream = None
+    if resume_value is None:
+        stream = await agent.astream_events(
+            {
+                "file_name": "Global_warming.pdf"
+            },
+            version="v3",
+            config=config,
+        )
+    else:
+        stream = await agent.astream_events(
+            Command(resume=resume_value),
+            version="v3",
+            config=config,
+        )
+
+    # async for message in stream.messages:
+    #     print(message.node, flush=True)
+    #     async for token in message.text:
+    #         print(token, end="", flush=True)
 
 
-async def main():
+    async for event in stream:
 
-    stream = await agent.astream_events(
-        {
-            "file_name": "Global_warming.pdf"
-        },
-        version="v3"
-    )
+        if event["method"] == "messages":
+            message = event["params"]
 
-    async def consume_messages():
-        async for message in stream.messages:
-            print(message.node, flush=True)
+            if "content" in message["data"][0]:
+                print(message["data"][0]["content"]["text"], end="", flush=True)
+            elif "delta" in message["data"][0]:
+                print(message["data"][0]["delta"]["text"], end="", flush = True)
 
-            async for token in message.text:
-                print(token, end="", flush=True)
+        elif event["method"] == "values":
 
-    await asyncio.gather(consume_messages())
+            interrupts = event["params"]["interrupts"]
+
+            if interrupts:
+                interrupt = interrupts[0]
+
+                interrupt_id = interrupt.id
+                interrupt_value = interrupt.value
+
+                print("VAlue is ", interrupt_value)
 
 
 asyncio.run(main())
 
+if interrupt_value["interrupt_type"] == "shelf_create":
+    print("Hello, the given file does not have an existing shelf.\n Are you ok with creating a new shelf with the following structure?")
+    print(interrupt_value["shelf"])
 
-#TODO: Format output to show both LLM and non-LLM messages.
-#TODO: Include HIL System right after Shelf Creation and assignment to get their confirmation.
+    user_input = input("Answer with either Yes/No")
+
+    if user_input == "Yes":
+        asyncio.run(main(interrupt_value["shelf"]))
+    else:
+        shelf_details = input("Enter the following details separated by |. shelf_name, shelf_description")
+        
+        shelf_name, shelf_description = shelf_details.split("|")
+
+        interrupt_value["shelf"]["metadata"]["shelf_name"] = shelf_name 
+        interrupt_value["shelf"]["metadata"]["shelf_description"] = shelf_description
+
+        asyncio.run(main(interrupt_value["shelf"]))
+    print(shelves)
+
+#TODO: Figure out a way to not print the same LLM stream after interrupt on a node.
+#TODO: Include HIL System right after shelf assignment to get their confirmation.
 #TODO: Figure out retrieval pipeline.
