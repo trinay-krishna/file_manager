@@ -118,7 +118,7 @@ class WorkerState(TypedDict):
 
 #Added for the sake of testing while developing, should ideally be fetched from database.
 shelves = [
-    Shelf(files=[], metadata=Shelf_Metadata(shelf_name="Environmental Studies", shelf_description="# Shelf for Environmental Studies and Sustainability", tags=["environmental studies", "sustainability", "climate change", "global warming", "ecology", "conservation"]))
+    #Shelf(files=[], metadata=Shelf_Metadata(shelf_name="Environmental Studies", shelf_description="# Shelf for Environmental Studies and Sustainability", tags=["environmental studies", "sustainability", "climate change", "global warming", "ecology", "conservation"]))
 ]
 
 meta_data_extractor = model.with_structured_output(MetaData)
@@ -350,14 +350,14 @@ interrupt_value = None
 
 is_interrupted = False
 
-async def main(resume_value = None):
+async def main(resume_value = None, file_name=""):
 
     global interrupt_value, interrupt_id, is_interrupted
     stream = None
     if resume_value is None:
         stream = await agent.astream_events(
             {
-                "file_name": "Global_warming.pdf"
+                "file_name": file_name
             },
             version="v3",
             config=config,
@@ -374,6 +374,7 @@ async def main(resume_value = None):
     #     async for token in message.text:
     #         print(token, end="", flush=True)
 
+    is_interrupted = False
 
     async for event in stream:
         if event["method"] == "messages":
@@ -399,61 +400,68 @@ async def main(resume_value = None):
                 print("VAlue is ", interrupt_value)
     
 
-
-asyncio.run(main())
-
-while is_interrupted:
-    if interrupt_value["interrupt_type"] == "shelf_create":
-        print("Hello, the given file does not have an existing shelf.\n Are you ok with creating a new shelf with the following structure?")
-        print(interrupt_value["shelf"])
-
-        user_input = input("Answer with either Yes/No")
-
-        if user_input == "Yes":
-            asyncio.run(main(interrupt_value["shelf"]))
-            
-        else:
-            shelf_details = input("Enter the following details separated by |. shelf_name, shelf_description")
-            
-            shelf_name, shelf_description = shelf_details.split("|")
-
-            interrupt_value["shelf"]["metadata"]["shelf_name"] = shelf_name 
-            interrupt_value["shelf"]["metadata"]["shelf_description"] = shelf_description
-
-            asyncio.run(main(interrupt_value["shelf"]))
+def store(file_name, main_shelves):
+    global shelves, is_interrupted, interrupt_value, interrupt_id
+    shelves = main_shelves
         
-        print(shelves)
+    asyncio.run(main(file_name=file_name))
 
-    if interrupt_value["interrupt_type"] == "shelf_assign":
-        user_input = input("The file is being placed into this shelf?\n Are you ok with this(Yes/No)")
+    while is_interrupted:
+        if interrupt_value["interrupt_type"] == "shelf_create":
+            print("Hello, the given file does not have an existing shelf.\n Are you ok with creating a new shelf with the following structure?")
+            print(interrupt_value["shelf"])
 
-        if user_input == "Yes":
-            asyncio.run(main({
-                "is_assigned": True,
-                "shelf": interrupt_value["shelf"]
-            }))
-            
-        else:
-            for index, shelf in enumerate(shelves):
-                print(f"Index - {index}\nName: {shelf.metadata.shelf_name}\nDescription: {shelf.metadata.shelf_description}\n")
-                print("=================================")
-            print("If none of these shelves seem appropriate for the file, type 'None'")
+            user_input = input("Answer with either Yes/No")
 
-            user_input = input("Select which shelf it should be assigned to(index/None)")
-
-            if user_input == "None":
-                asyncio.run(main({
-                    "is_assigned": False,
-                    "shelf": None
-                }))
+            if user_input == "Yes":
+                asyncio.run(main(resume_value=interrupt_value["shelf"], file_name=file_name))
+                
             else:
-                shelf_index = int(user_input)
-                asyncio.run(main({
-                    "is_assigned": True,
-                    "shelf": shelves[shelf_index].model_dump()
-                }))
-        
+                shelf_details = input("Enter the following details separated by |. shelf_name, shelf_description")
+                
+                shelf_name, shelf_description = shelf_details.split("|")
 
+                interrupt_value["shelf"]["metadata"]["shelf_name"] = shelf_name 
+                interrupt_value["shelf"]["metadata"]["shelf_description"] = shelf_description
+
+                asyncio.run(resume_value=main(interrupt_value["shelf"], file_name=file_name))
+            
+            print(shelves)
+
+        if interrupt_value["interrupt_type"] == "shelf_assign":
+            user_input = input("The file is being placed into this shelf?\n Are you ok with this(Yes/No)")
+
+            if user_input == "Yes":
+                asyncio.run(main(resume_value={
+                    "is_assigned": True,
+                    "shelf": interrupt_value["shelf"]
+                }, file_name=file_name))
+                
+            else:
+                for index, shelf in enumerate(shelves):
+                    print(f"Index - {index}\nName: {shelf.metadata.shelf_name}\nDescription: {shelf.metadata.shelf_description}\n")
+                    print("=================================")
+                print("If none of these shelves seem appropriate for the file, type 'None'")
+
+                user_input = input("Select which shelf it should be assigned to(index/None)")
+
+                if user_input == "None":
+                    asyncio.run(main(resume_value={
+                        "is_assigned": False,
+                        "shelf": None
+                    }, file_name=file_name))
+                else:
+                    shelf_index = int(user_input)
+                    asyncio.run(main(resume_value={
+                        "is_assigned": True,
+                        "shelf": shelves[shelf_index].model_dump()
+                    }, file_name=file_name))
+            
+    print("\n\n")
+    print("==================================================================")
+    print("Storage Process Exiting.")
+    print("==================================================================")
+    return shelves
 
 
 #TODO: Figure out a way to not print the same LLM stream after interrupt on a node.
